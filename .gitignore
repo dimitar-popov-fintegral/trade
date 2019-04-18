@@ -2,6 +2,18 @@
 *.hdf
 *.pdf
 
+
+# emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
