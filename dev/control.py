@@ -8,13 +8,13 @@ sys.path.append(os.path.join(THIS_DIR, '..'))
 
 import dev.data as data
 
-################################################################################        
+################################################################################
 def main():
     logger = logging.getLogger(__name__)
 
     logger.info('instruments defined')
     etf_meta = data.read_six_etf_list()
-    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol]
+    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:10]
     instruments = {
         'stocks': {*etf_tickers},
         'bonds':{},
@@ -24,7 +24,8 @@ def main():
             ('CHF', 'USD'),
         }
     }
-
+    result = data.ap_queue_requests(worker_function=data.ap_weekly_adjusted, symbols=instruments['stocks'])
+    '''
     ##
     base_ts_object = data.init_alpha_vantage_ts_class()
     base_fx_object = data.init_alpha_vantage_fx_class()
@@ -42,8 +43,9 @@ def main():
     with pandas.HDFStore(os.path.join(data.data_dir(), 'time_series.hdf')) as store:
         to_store = data.pull_data(tickers=instruments, ts_caller=ts, fx_caller=fx, size='compact')
         path = data.store_data(to_store=to_store, hdf_store=store)
+    '''
 
-    return path
+    return result
 
 ################################################################################
 if __name__ == '__main__':
@@ -66,4 +68,5 @@ if __name__ == '__main__':
     logger.addHandler(c_handler)
 
     logger.info('Controller active')
-    main()
+    result, queue = main()
+    print(result)
