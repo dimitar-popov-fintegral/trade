@@ -8,11 +8,31 @@ import datetime
 import requests
 import multiprocessing
 import logging
+import time 
 
 from typing import Callable
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.foreignexchange import ForeignExchange
 from enum import Enum
+
+
+################################################################################
+BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
+
+
+################################################################################
+def data_dir() -> str:
+    return os.path.join(BASE_DIR, 'data')
+
+
+################################################################################
+def store_dir() -> str:
+    return os.path.join(BASE_DIR, 'store')
+
+
+################################################################################
+class API_KEYS(Enum):
+    alpha_vantage_key = read_alpha_vantage_api_key()
 
 
 ################################################################################
@@ -59,31 +79,36 @@ def ap_parallel_requests(symbols: list):
 ################################################################################
 def ap_weekly_adjusted(symbol):
     '''direct access to alpha vantage via requests library'''
-    key = API_KEYS.alpha_vantage_key.value
-    resp = requests.get(r'https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol={}&apikey={}'.format(symbol, key))
+    params = {
+        'function': 'TIME_SERIES_WEEKLY_ADJUSTED',
+        'apikey': API_KEYS.alpha_vantage_key.value,
+        'symbol': symbol,
+    }
+    resp = requests.get(url=r'https://www.alphavantage.co/query', params=params)
     assert resp.status_code == 200
 
     return resp
     
 
 ################################################################################
-BASE_DIR = r'/home/dimitar/Office/trade'
-
-
-################################################################################
-class API_KEYS(Enum):
-    alpha_vantage_key = '46QNPW927WB7YXSF'
+def read_alpha_vantage_api_key() -> str:
+    """Reads the AlphaVantage API key from non-versioned file"""
+    api_key_file = os.path.join(store_dir(), 'secrets', 'alpha_vantage_api_key')
+    assert os.path.isfile(api_key_file),\
+        'missing AlphaVantage API key file, check ./store/secrets/ folder'
+    with open(api_key_file) as keyfile:
+        return keyfile.read()
 
 
 ################################################################################
 def init_alpha_vantage_ts_class(key: str = API_KEYS.alpha_vantage_key.value) -> TimeSeries:
-    """simple function to get a parameterized ALPHA VANTAGE price source class"""
+    """simple function to get a parametrized ALPHA VANTAGE price source class"""
     return TimeSeries(key=key)      
 
 
 ################################################################################
 def init_alpha_vantage_fx_class(key: str = API_KEYS.alpha_vantage_key.value) -> ForeignExchange:
-    """simple function to get a parameterized ALPHA VANTAGE FX source class"""
+    """simple function to get a parametrized ALPHA VANTAGE FX source class"""
     return ForeignExchange(key=key)
 
 
@@ -95,11 +120,6 @@ def get_weekly_adjusted_data(symbol: str, object: TimeSeries = init_alpha_vantag
 ################################################################################
 def get_daily_adjusted_data(symbol: str, object: TimeSeries = init_alpha_vantage_ts_class()):
     return object.get_daily_adjusted(symbol=symbol)
-
-
-################################################################################
-def data_dir() -> str:
-    return os.path.join(BASE_DIR, 'data')
 
 
 ################################################################################

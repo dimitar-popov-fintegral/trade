@@ -1,7 +1,9 @@
 # custom
 *.hdf
 *.pdf
-
+.idea/
+store/secrets/
+*.profile
 
 # emacs
 *~
