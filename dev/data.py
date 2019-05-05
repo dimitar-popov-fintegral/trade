@@ -48,7 +48,7 @@ def pull_data(tickers: dict, ts_caller: Callable[[str], dict], fx_caller: Callab
         'missing tickers entry <stocks>, aborting'
     for ticker in tickers[element]:
         logger.info('Ticker {}'.format(ticker))
-        raw_data, raw_info = ts_caller(symbol=ticker)
+        raw_data, raw_info = ts_caller(ticker)
         df = pandas.DataFrame(raw_data).T
         info = pandas.Series(raw_info)
         info['class'] = element
@@ -66,7 +66,7 @@ def pull_data(tickers: dict, ts_caller: Callable[[str], dict], fx_caller: Callab
         'missing tickers entry <index>, aborting'
     for ticker in tickers[element]:
         logger.info('Ticker {}'.format(ticker))
-        raw_data, raw_info = ts_caller(symbol=ticker)
+        raw_data, raw_info = ts_caller(ticker)
         df = pandas.DataFrame(raw_data).T
         info = pandas.Series(raw_info)
         info['class'] = element
@@ -84,7 +84,7 @@ def pull_data(tickers: dict, ts_caller: Callable[[str], dict], fx_caller: Callab
         'missing tickers entry <bonds>, aborting'
     for ticker in tickers[element]:
         logger.info('Ticker {}'.format(ticker))
-        raw_data, raw_info = ts_caller(symbol=ticker)
+        raw_data, raw_info = ts_caller(ticker)
         df = pandas.DataFrame(raw_data).T
         info = pandas.Series(raw_info)
         info['class'] = element
