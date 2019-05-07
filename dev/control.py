@@ -7,6 +7,7 @@ THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(THIS_DIR, '..'))
 
 import dev.data as data
+import dev.alpha_vantage as ap
 
 ################################################################################
 def main():
@@ -14,7 +15,7 @@ def main():
 
     logger.info('instruments defined')
     etf_meta = data.read_six_etf_list()
-    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:10]
+    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:500]
     instruments = {
         'stocks': {*etf_tickers},
         'bonds':{},

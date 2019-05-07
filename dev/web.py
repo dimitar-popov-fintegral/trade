@@ -1,64 +1,98 @@
-from bs4 import BeautifulSoup
+import os
 import requests
+import time
+import numpy
+import json
+from selenium import webdriver
+from selenium.common import exceptions
+from bs4 import BeautifulSoup
+
+import dev.data as dt
+
 
 ################################################################################
 def six_url():
-    return r'https://www.six-group.com/exchanges/funds/explorer/etf/closings_en.html?Segment=funds&ProductLine=ET|PE|AE'
+    return r'https://www.six-group.com/exchanges/funds/explorer/etf/closings_en.html'
 
 
 ################################################################################
 def six_header():
 
     return {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Host': 'www.six-group.com',
+        'Connection': 'keep-alive',
         'X-Requested-With': 'XMLHttpRequest',
-        'Host': 'www.six-group.com',
-        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive',
-        # 'Cookie': 'Navajo=A+/pZp8buQkJ8J9lDHTokZUkYfuktdFkfvLhsbQbcywFDQ4qmVuanveVytmba7En6mXJKbS4e4A-; tableConfig_closingsfunds=; _ga=GA1.2.1207636625.1554557063; _gid=GA1.2.693968857.1554557063',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0',
-    }
-
-    '''
-    return {
-        'Host': 'www.six-group.com',
-        'Connection': 'keep-alive',
-        'Pragma': 'no-cache',
-        'Cache-Control': 'max-age=0',
-        'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/73.0.3683.75 Chrome/73.0.3683.75 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        # 'Referer': 'https://www.six-group.com/exchanges/funds/explorer/etf/closings_en.html?Segment=funds&ProductLine=ET|PE|AE&TradingState=T&sortBy=ClosingPerformance&sortOrder=0',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': '*/*',
+        'Upgrade-Insecure-Requests': '1',
         'Accept-Encoding': 'gzip, deflate, br',
         'Accept-Language': 'en',
-        'Cookie': 'tableConfig_closingsfunds=; ProxySession=0c89f00a1aa2K0AAGwoaexQ7UriiaIV76EUVfeA0GSGNn52hPNqcWLAAjl; Navajo=1pAGNrx7UDTXYMvFMnq+UHuVqLJ71mhpYJ8u5ARNCHyic/8gSEyMl8rxtSgwWuulKWwyeQ6aUyQ-',
-    }'''
+    }
 
 
 ################################################################################
-def six_request(url, headers):
+def six_params():
+    return {
+        'Segment': 'funds',
+        'ProductLine': 'ET%7CPE%7CAE',
+        'dojo.preventCach': '1557077066938'
+    }
+
+################################################################################
+def six_request(url, headers, parameters):
     '''makes a request to a SIX STOCK EXCHANGE data serving website'''
-    resp = requests.get(url=url, headers=headers)
+    resp = requests.get(url=url, headers=headers, params=parameters)
     return resp
 
 
 ################################################################################
-def mock_table_request():
-    '''example request to SIX STOCK EXCHANGE data service'''
-    url = six_url()
-    headers = header()
-    resp = six_request(url=url, headers=headers)
-    assert resp.status_code == 200
-    
-    soup = BeautifulSoup(resp.text, features='html.parser')
-    for link in soup.find_all('td'):
-        if 'class_closingfunds_column4' in str(link):
-            print(link.get_text())
+def path_to_chrome_driver():
+    return os.path.join(dt.BASE_DIR, '..', 'develop', 'web', 'chromedriver')
 
-    return soup
+
+################################################################################
+def headless_table_request(url: str):
+
+    gather = dict()
+
+    driver = webdriver.Chrome(executable_path=path_to_chrome_driver())
+    driver.get(url=url)
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
+    time.sleep(3)
+
+    number_of_results_xpath = '''
+    //*[@id="closingsfunds"]/table[2]/tbody/tr/td[18]    
+    '''
+    number_of_results = driver.find_element_by_xpath(number_of_results_xpath)
+    elements = number_of_results.text.split(' ')
+    assert int(elements[0]) == 1,\
+        'ChromeDriver appears not to have started with the first result'
+    per_page = int(elements[2])
+    total = int(elements[4])
+    button_clicks = total // per_page
+
+    for i in range(button_clicks):
+
+        try:
+            nav_buttons_xpath = '''
+            //*[@id="closingsfunds"]/table[2]/tbody/tr/td/button    
+            '''
+            nav_buttons = driver.find_elements_by_xpath(nav_buttons_xpath)
+            for button in nav_buttons:
+                if button.get_property('name') == 'chunking-next':
+                    button.click()
+                    time.sleep(1+numpy.random.rand())
+                    break
+        except exceptions.NoSuchElementException as err:
+            print('found no such element on the page [{}]'.format(err))
+
+        proposed_xpath = '''
+        //*[@id="closingsfunds"]/tbody/tr 
+        '''
+        results = driver.find_elements_by_xpath(proposed_xpath)
+        print('Number of results', len(results))
+        gather.update({i: [x.text for x in results]})
+        del results
+
+    return gather

@@ -5,7 +5,6 @@ import datetime
 import logging
 from typing import Callable
 
-import dev.alpha_vantage as ap
 
 ################################################################################
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
