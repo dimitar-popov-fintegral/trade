@@ -4,6 +4,7 @@
 .idea/
 store/secrets/
 *.profile
+/output/
 
 # emacs
 *~

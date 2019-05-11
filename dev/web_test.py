@@ -24,7 +24,7 @@ def test_headless_table_request():
 
     res = headless_table_request(url=six_url())
 
-    with open('six_etf_list.txt', 'w') as file:
+    with open('six_etf_list_2.txt', 'w') as file:
         file.write(json.dumps(res))
 
     [print(x) for iteration, x in res.items()]

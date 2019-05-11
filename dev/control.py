@@ -1,6 +1,5 @@
 import os
 import sys
-import logging 
 import pandas
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -9,65 +8,65 @@ sys.path.append(os.path.join(THIS_DIR, '..'))
 import dev.data as data
 import dev.alpha_vantage as ap
 
-################################################################################
-def main():
-    logger = logging.getLogger(__name__)
 
+################################################################################
+def etf_data():
+    logger = logging.getLogger()
+
+    ##
     logger.info('instruments defined')
     etf_meta = data.read_six_etf_list()
-    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:500]
+    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:400]
+
     instruments = {
-        'stocks': {*etf_tickers},
+        'stocks': list(etf_tickers),
         'bonds':{},
         'index':{},
-        'fx':{
+        'fx': {
             ('EUR', 'USD'),
             ('CHF', 'USD'),
         }
     }
-    result = data.ap_queue_requests(worker_function=data.ap_weekly_adjusted, symbols=instruments['stocks'])
-    '''
+
     ##
-    base_ts_object = data.init_alpha_vantage_ts_class()
-    base_fx_object = data.init_alpha_vantage_fx_class()
+    logger.info('stocks, bonds, indices & fx')
+    for instrument_type, instrument_list in instruments.items():
+        if len(instrument_list) == 0:
+            continue
 
-    def ts(symbol):
-        def inner(symbol, size='full'):
-            return base_ts_object.get_daily_adjusted(symbol, outputsize=size)
-        return inner(symbol=symbol)
+        caller = ap.weekly_adjusted
+        if instrument_type == 'fx':
+            caller = ap.weekly_fx
 
-    def fx(from_symbol, to_symbol):
-        def inner(from_symbol=from_symbol, to_symbol=to_symbol, size='compact'):
-            return base_fx_object.get_currency_exchange_daily(from_symbol=from_symbol, to_symbol=to_symbol, outputsize=size)
-        return inner(from_symbol=from_symbol, to_symbol=to_symbol)
+        result, queue = ap.queue_requests(
+            request_type=instrument_type,
+            worker_function=caller,
+            symbols=instrument_list
+        )
 
-    with pandas.HDFStore(os.path.join(data.data_dir(), 'time_series.hdf')) as store:
-        to_store = data.pull_data(tickers=instruments, ts_caller=ts, fx_caller=fx, size='compact')
-        path = data.store_data(to_store=to_store, hdf_store=store)
-    '''
+        instruments.update({
+            instrument_type: {
+                'Result': result,
+                'Queue': queue
+            }})
+
+        del result, queue
+
+
+    result = instruments
+    store = pandas.HDFStore(os.path.join(data.output_dir(), 'time_series.h5'))
+    data.store_data(to_store=result, hdf_store=store)
 
     return result
+
 
 ################################################################################
 if __name__ == '__main__':
 
     import logging
-
-    # Create a custom logger
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-
-    # Create handlers
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.INFO)
-
-    # Create formatters and add it to handlers
-    c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
-    c_handler.setFormatter(c_format)
-
-    # Add handlers to the logger
-    logger.addHandler(c_handler)
-
+    logging.basicConfig(format='%(asctime)s | %(levelname)-10s | %(processName)s | %(name)s | %(message)s')
+    logger = logging.getLogger()
+    logger.setLevel('INFO')
     logger.info('Controller active')
-    result, queue = main()
+    result = etf_data()
     print(result)

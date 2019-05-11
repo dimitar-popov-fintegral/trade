@@ -2,10 +2,10 @@ import os
 import requests
 import time
 import numpy
-import json
+import logging
+
 from selenium import webdriver
 from selenium.common import exceptions
-from bs4 import BeautifulSoup
 
 import dev.data as dt
 
@@ -48,19 +48,31 @@ def six_request(url, headers, parameters):
 
 ################################################################################
 def path_to_chrome_driver():
+
     return os.path.join(dt.BASE_DIR, '..', 'develop', 'web', 'chromedriver')
 
 
 ################################################################################
 def headless_table_request(url: str):
+    """Function to use Selenium + Chromium WebDriver to scrape table from url"""
+    logger = logging.getLogger(__name__)
 
+    ##
+    logger.debug('<- prepare WebDriver ->')
     gather = dict()
-
     driver = webdriver.Chrome(executable_path=path_to_chrome_driver())
     driver.get(url=url)
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
-    time.sleep(3)
+    time.sleep(2)
 
+    logger.debug('<- experimental features ->')
+    table_options_xpath = '''
+    //*[@id="configButton_closingsfunds_label"]
+    '''
+    table_options_button = driver.find_element_by_xpath(table_options_xpath)
+    table_options_button.click()
+
+    logger.debug('<- estimate the number of results to scrape ->')
     number_of_results_xpath = '''
     //*[@id="closingsfunds"]/table[2]/tbody/tr/td[18]    
     '''
@@ -72,7 +84,16 @@ def headless_table_request(url: str):
     total = int(elements[4])
     button_clicks = total // per_page
 
+    logger.debug('<- gather results from page, then click next page button->')
     for i in range(button_clicks):
+
+        proposed_xpath = '''
+        //*[@id="closingsfunds"]/tbody/tr 
+        '''
+        results = driver.find_elements_by_xpath(proposed_xpath)
+        logger.debug('<- Number of results ->', len(results))
+        gather.update({i: [x.text for x in results]})
+        del results
 
         try:
             nav_buttons_xpath = '''
@@ -86,13 +107,5 @@ def headless_table_request(url: str):
                     break
         except exceptions.NoSuchElementException as err:
             print('found no such element on the page [{}]'.format(err))
-
-        proposed_xpath = '''
-        //*[@id="closingsfunds"]/tbody/tr 
-        '''
-        results = driver.find_elements_by_xpath(proposed_xpath)
-        print('Number of results', len(results))
-        gather.update({i: [x.text for x in results]})
-        del results
 
     return gather

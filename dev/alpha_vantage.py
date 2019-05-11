@@ -3,8 +3,10 @@ import os
 import logging
 import time
 import multiprocessing
+import pandas
+
 from enum import Enum
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 
 import dev.data as dt
 
@@ -35,32 +37,45 @@ class API_KEYS(Enum):
 
 
 ################################################################################
-def queue_requests(worker_function: Callable[[str], requests.models.Response], symbols: list) -> Tuple:
-    """alpha vantage limits to access API:
-    5-calls per minute
-    500 calls per day
+class RequestType(Enum):
+    stocks = 'stocks'
+    bonds = 'bonds'
+    index = 'index'
+    fx = 'fx'
+
+
+################################################################################
+def queue_requests(request_type: str,
+                   worker_function: Callable,
+                   symbols: list) \
+        -> Tuple:
+    """
+    Alpha vantage limits to access API:
+    - 5 calls per minute
+    - 500 calls per day
     """
     logger = logging.getLogger(__name__)
     queue = list()
     results = dict()
-    sleep_time = 12.5
+    sleep_time = 12.1
     for symbol in symbols:
         logger.info('requesting [{}]'.format(symbol))
         try:
-            payload = worker_function(symbol)
-            if 'Error Message' in payload.json().keys():
-                queue.append(symbol)
-                time.sleep(sleep_time)
-            elif 'Note' in payload.json().keys():
-                queue.append(symbol)
-                time.sleep(sleep_time)
-            else:
-                logging.info('success for [{}]'.format(symbol))
-                results.update({symbol: payload})
-                time.sleep(sleep_time)
-        except AssertionError:
-            logger.debug('request for [{}] did not return status code 200'.format(symbol))
+            meta, data = worker_function(symbol)
+            logging.info('success for [{}]'.format(symbol))
+
+            df = pandas.DataFrame(data).T
+            info = pandas.Series(meta)
+            info['class'] = request_type
+            results[symbol] = {
+                'data': df,
+                'meta': info
+            }
+            time.sleep(sleep_time)
+
+        except AssertionError as err:
             queue.append(symbol)
+            logger.error('request for [{}] failed, got error -> [{}]'.format(symbol, err))
 
     return results, queue
 
@@ -110,19 +125,28 @@ def daily(symbol):
 
 
 ################################################################################
-def weekly_adjusted(symbol):
-    """direct access to alpha vantage via requests library"""
+def weekly_adjusted(symbol: str) -> List[dict]:
+    """Direct access to alpha vantage via requests library"""
     params = {
+        'symbol': '{}'.format(symbol),
         'function': 'TIME_SERIES_WEEKLY_ADJUSTED',
         'apikey': API_KEYS.alpha_vantage_key.value,
-        'symbol': symbol,
     }
+
+    return_keys = [
+        ReturnKeys.MetaData.value,
+        ReturnKeys.WeeklyAdjusted.value
+    ]
+
     resp = requests.get(url=r'https://www.alphavantage.co/query', params=params)
-    assert resp.status_code == 200
+    assert resp.status_code == 200,\
+        'response did not return 200, got [{}] instead'.format(resp.status_code)
 
     data = resp.json()
-    return data[ReturnKeys.MetaData.value], \
-           data[ReturnKeys.WeeklyAdjusted.value]
+    assert all(name in data.keys() for name in return_keys),\
+        'response did not contain required return_keys [{}]'.format(return_keys)
+
+    return [data[key] for key in return_keys]
 
 
 ################################################################################
@@ -142,17 +166,27 @@ def weekly(symbol: str) -> Tuple:
 
 
 ################################################################################
-def weekly_fx(from_symbol, to_symbol) -> Tuple[dict, dict]:
+def weekly_fx(symbol: Tuple[str, str]) -> List[dict]:
     """direct access to FX time-series via requests library"""
+    from_symbol, to_symbol = symbol
     params = {
         'function': 'FX_WEEKLY',
         'apikey': API_KEYS.alpha_vantage_key.value,
         'from_symbol': from_symbol,
         'to_symbol': to_symbol,
     }
+
+    return_keys = [
+        ReturnKeys.MetaData.value,
+        ReturnKeys.FX.value
+    ]
+
     resp = requests.get(url=r'https://www.alphavantage.co/query', params=params)
-    assert resp.status_code == 200
+    assert resp.status_code == 200,\
+        'response did not return 200, got [{}] instead'.format(resp.status_code)
 
     data = resp.json()
-    return data[ReturnKeys.MetaData.value], \
-           data[ReturnKeys.FX.value]
+    assert all(name in data.keys() for name in return_keys),\
+        'response did not contain required return_keys [{}]'.format(return_keys)
+
+    return [data[key] for key in return_keys]
