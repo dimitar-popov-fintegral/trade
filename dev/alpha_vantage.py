@@ -3,6 +3,8 @@ import os
 import logging
 import time
 import multiprocessing
+import datetime
+import numpy
 import pandas
 
 from enum import Enum
@@ -47,8 +49,7 @@ class RequestType(Enum):
 ################################################################################
 def queue_requests(request_type: str,
                    worker_function: Callable,
-                   symbols: list) \
-        -> Tuple:
+                   symbols: list) -> Tuple:
     """
     Alpha vantage limits to access API:
     - 5 calls per minute
@@ -190,3 +191,48 @@ def weekly_fx(symbol: Tuple[str, str]) -> List[dict]:
         'response did not contain required return_keys [{}]'.format(return_keys)
 
     return [data[key] for key in return_keys]
+
+
+################################################################################
+def store_data(to_store: dict, hdf_store: pandas.HDFStore) -> str:
+    """Stores data-set by appending to .hdf file, returns the output file-path"""
+    logger = logging.getLogger()
+
+    time_stamp = datetime.datetime.now().strftime("%a-%d-%B-%Y_%H-%M-%S")
+    for asset_class in to_store.keys():
+        if len(to_store[asset_class]) == 0:
+            continue
+        for ticker in to_store[asset_class]['Result'].keys():
+            data_entry = '/av/{time_stamp}/time_series/{ticker}'.format(time_stamp=time_stamp, ticker=ticker)
+            hdf_store[data_entry] = to_store[asset_class]['Result'][ticker]['data'].astype(numpy.float32)
+
+            meta_entry = '/av/{time_stamp}/meta/{ticker}'.format(time_stamp=time_stamp, ticker=ticker)
+            hdf_store[meta_entry] = to_store[asset_class]['Result'][ticker]['meta']
+
+    return 'in progress'
+
+
+################################################################################
+def read_raw_data(store: pandas.io.pytables.HDFStore,
+                  time_stamp: str,
+                  time_series_element: str) -> Tuple:
+
+    from itertools import compress
+    logger = logging.getLogger()
+
+    ##
+    logger.debug('getting AV time-series data')
+    mask = [x.startswith('/av/{}/time_series'.format(time_stamp)) for x in store.keys()]
+    search_keys = compress(store.keys(), mask)
+    merge = {key.split('/')[-1]: store[key][time_series_element] for key in search_keys}
+    time_series = pandas.DataFrame(merge)
+    time_series.index = pandas.DatetimeIndex(time_series.index)
+
+    ##
+    logger.debug('getting AV meta-data')
+    mask = [x.startswith('/av/{}/meta'.format(time_stamp)) for x in store.keys()]
+    search_keys = compress(store.keys(), mask)
+    merge = {key.split('/')[-1]: store[key] for key in search_keys}
+    meta = pandas.DataFrame(merge)
+
+    return time_series, meta

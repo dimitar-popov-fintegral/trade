@@ -16,7 +16,7 @@ def etf_data():
     ##
     logger.info('instruments defined')
     etf_meta = data.read_six_etf_list()
-    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][:400]
+    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][400:800]
 
     instruments = {
         'stocks': list(etf_tickers),
@@ -52,12 +52,10 @@ def etf_data():
 
         del result, queue
 
+    store = pandas.HDFStore(os.path.join(data.output_dir(), 'time_series.h5'), 'w')
+    ap.store_data(to_store=instruments, hdf_store=store)
 
-    result = instruments
-    store = pandas.HDFStore(os.path.join(data.output_dir(), 'time_series.h5'))
-    data.store_data(to_store=result, hdf_store=store)
-
-    return result
+    return instruments
 
 
 ################################################################################
