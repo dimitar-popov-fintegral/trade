@@ -1,1 +1,0 @@
-source /home/dimitar/Thirdparty/miniconda/bin/activate /home/dimitar/Environments/BASE/

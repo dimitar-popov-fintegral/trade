@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas
+import datetime
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(THIS_DIR, '..'))
@@ -52,7 +53,8 @@ def etf_data():
 
         del result, queue
 
-    store = pandas.HDFStore(os.path.join(data.output_dir(), 'time_series.h5'), 'w')
+    time_stamp = datetime.datetime.now().strftime("%a-%d-%B-%Y_%H-%M-%S")
+    store = pandas.HDFStore(os.path.join(data.output_dir(), 'weekly_{}.h5'.format(time_stamp)), 'w')
     ap.store_data(to_store=instruments, hdf_store=store)
 
     return instruments

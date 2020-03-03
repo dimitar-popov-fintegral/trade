@@ -3,10 +3,10 @@ import os
 import logging
 import time
 import multiprocessing
-import datetime
 import numpy
 import pandas
 
+from itertools import compress
 from enum import Enum
 from typing import Callable, Tuple, List
 
@@ -119,7 +119,7 @@ def daily(symbol):
     }
     resp = requests.get(url=r'https://www.alphavantage.co/query', params=params)
     assert resp.status_code == 200
-
+    breakpoint()
     data = resp.json()
     return data[ReturnKeys.MetaData.value], \
            data[ReturnKeys.Daily.value]
@@ -194,35 +194,33 @@ def weekly_fx(symbol: Tuple[str, str]) -> List[dict]:
 
 
 ################################################################################
-def store_data(to_store: dict, hdf_store: pandas.HDFStore) -> str:
+def store_data(to_store: dict, hdf_store: pandas.HDFStore) -> int:
     """Stores data-set by appending to .hdf file, returns the output file-path"""
     logger = logging.getLogger()
 
-    time_stamp = datetime.datetime.now().strftime("%a-%d-%B-%Y_%H-%M-%S")
     for asset_class in to_store.keys():
         if len(to_store[asset_class]) == 0:
             continue
         for ticker in to_store[asset_class]['Result'].keys():
-            data_entry = '/av/{time_stamp}/time_series/{ticker}'.format(time_stamp=time_stamp, ticker=ticker)
+            data_entry = '/av/time_series/{ticker}'.format(ticker=ticker)
             hdf_store[data_entry] = to_store[asset_class]['Result'][ticker]['data'].astype(numpy.float32)
 
-            meta_entry = '/av/{time_stamp}/meta/{ticker}'.format(time_stamp=time_stamp, ticker=ticker)
+            meta_entry = '/av/meta/{ticker}'.format(ticker=ticker)
             hdf_store[meta_entry] = to_store[asset_class]['Result'][ticker]['meta']
 
-    return 'in progress'
+    return 0
 
 
 ################################################################################
 def read_raw_data(store: pandas.io.pytables.HDFStore,
-                  time_stamp: str,
                   time_series_element: str) -> Tuple:
 
-    from itertools import compress
     logger = logging.getLogger()
 
     ##
     logger.debug('getting AV time-series data')
-    mask = [x.startswith('/av/{}/time_series'.format(time_stamp)) for x in store.keys()]
+    mask = [x.startswith('/av/time_series') for x in store.keys()]
+    num_time_series = sum(mask)
     search_keys = compress(store.keys(), mask)
     merge = {key.split('/')[-1]: store[key][time_series_element] for key in search_keys}
     time_series = pandas.DataFrame(merge)
@@ -230,9 +228,13 @@ def read_raw_data(store: pandas.io.pytables.HDFStore,
 
     ##
     logger.debug('getting AV meta-data')
-    mask = [x.startswith('/av/{}/meta'.format(time_stamp)) for x in store.keys()]
+    mask = [x.startswith('/av/meta') for x in store.keys()]
+    num_meta = sum(mask)
     search_keys = compress(store.keys(), mask)
     merge = {key.split('/')[-1]: store[key] for key in search_keys}
     meta = pandas.DataFrame(merge)
+
+    assert num_time_series == num_meta,\
+        'number of entries in meta-data != number of entries in time-series'
 
     return time_series, meta
