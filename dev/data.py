@@ -1,5 +1,6 @@
 import os
 import pandas
+import numpy 
 
 
 ################################################################################
@@ -36,3 +37,8 @@ def read_six_etf_list() -> pandas.DataFrame:
     return pandas.read_csv(os.path.join(data_dir(), 'six_etf.csv'), header=0, index_col=0, sep=',', encoding='utf-8')
 
 
+################################################################################
+def log_returns(x):
+    return numpy.log(x[1:]) - numpy.log(x[:-1])
+    
+    

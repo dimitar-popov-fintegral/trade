@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Callable, Tuple, List
 
 import dev.data as dt
+import dev.data_util as du
 
 
 ################################################################################
@@ -191,6 +192,18 @@ def weekly_fx(symbol: Tuple[str, str]) -> List[dict]:
         'response did not contain required return_keys [{}]'.format(return_keys)
 
     return [data[key] for key in return_keys]
+
+
+################################################################################
+def parse_response(response):
+    meta, data = response
+    assert isinstance(meta, dict)
+    assert isinstance(data, dict)
+
+    df = pandas.DataFrame.from_dict(data).T
+    df.astype(float)
+
+    return meta, df
 
 
 ################################################################################

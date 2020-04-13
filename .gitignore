@@ -5,6 +5,7 @@
 store/secrets/
 *.profile
 /output/
+/mongo_dir/
 
 # emacs
 *~

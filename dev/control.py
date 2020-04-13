@@ -2,62 +2,41 @@ import os
 import sys
 import pandas
 import datetime
+import time 
+import yfinance as yf
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(THIS_DIR, '..'))
 
 import dev.data as data
 import dev.alpha_vantage as ap
+import dev.data_util as dutil 
 
 
 ################################################################################
-def etf_data():
-    logger = logging.getLogger()
+def fetch_av_data(tickers, date, redis):
+    for ticker in tickers:
+        print("AlphaVantage get: [%s]" %ticker)
+        key = "%s_av_%s" %(date, ticker)
+        print("key [%s]" %key)
+        result =  ap.daily_adjusted(ticker)
+        print("Saving to RedisDb as [%s]" %key)
+        dutil.r_write(key, dutil.compress(result), redis)
+        time.sleep(12.1)
 
-    ##
-    logger.info('instruments defined')
-    etf_meta = data.read_six_etf_list()
-    etf_tickers = ['{}.SW'.format(x) for x in etf_meta.Symbol][400:800]
 
-    instruments = {
-        'stocks': list(etf_tickers),
-        'bonds':{},
-        'index':{},
-        'fx': {
-            ('EUR', 'USD'),
-            ('CHF', 'USD'),
-        }
-    }
-
-    ##
-    logger.info('stocks, bonds, indices & fx')
-    for instrument_type, instrument_list in instruments.items():
-        if len(instrument_list) == 0:
-            continue
-
-        caller = ap.weekly_adjusted
-        if instrument_type == 'fx':
-            caller = ap.weekly_fx
-
-        result, queue = ap.queue_requests(
-            request_type=instrument_type,
-            worker_function=caller,
-            symbols=instrument_list
-        )
-
-        instruments.update({
-            instrument_type: {
-                'Result': result,
-                'Queue': queue
-            }})
-
-        del result, queue
-
-    time_stamp = datetime.datetime.now().strftime("%a-%d-%B-%Y_%H-%M-%S")
-    store = pandas.HDFStore(os.path.join(data.output_dir(), 'weekly_{}.h5'.format(time_stamp)), 'w')
-    ap.store_data(to_store=instruments, hdf_store=store)
-
-    return instruments
+################################################################################
+def fetch_yf_data(tickers, date, redis):
+    for ticker in tickers:
+        print("Yahoo! get [%s]" %ticker)
+        key = "%s_yf_%s" %(date, ticker)
+        instrument = yf.Ticker(ticker)
+        print("key [%s]" %key)
+        df = instrument.history(auto_adjust=False, period="max")
+        meta = instrument.info
+        result = {"price": df, "meta": meta}
+        dutil.r_write(key, dutil.compress(result), redis)
+        time.sleep(1)
 
 
 ################################################################################
@@ -68,5 +47,11 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel('INFO')
     logger.info('Controller active')
-    result = etf_data()
-    print(result)
+    today = datetime.datetime.now().strftime('%Y-%m-%d')
+
+    with dutil.RedisDb() as redis:
+        tickers = ["QQQ", "VEA", "QTEC", "BND", "SMH", "VWO", "EEM"]
+        #fetch_av_data(tickers, today, redis)
+        tickers = ["^IRX","QQQ", "VEA", "QTEC", "BND", "SMH", "VWO", "EEM"]
+        fetch_yf_data(tickers, today, redis)
+            
